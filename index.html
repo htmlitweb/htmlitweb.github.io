@@ -3487,7 +3487,6 @@
 
             let currentPoll = post.poll;
             let newVoters = currentPoll.voters || [];
-
             if (newVoters.includes(currentUser.uid)) {
                 showAlert("You have already voted on this poll.");
                 return;
@@ -3499,22 +3498,20 @@
 
 				// Construct the complete updated poll object
 				const updatedPoll = {
-					// Spread existing poll data to retain any other fields within 'poll'
-					// if 'post.poll' contains more than just 'options' and 'voters'
-					...(post.poll || {}),
+					...currentPoll, // Spread existing poll data (if any other fields exist in poll)
 					options: updatedOptions,
 					voters: newVoters
 				};
 
 				try {
-					// Update the entire 'poll' field with the reconstructed object
 					await updateDoc(postRef, {
-						poll: updatedPoll // <--- CHANGE THIS LINE
+						poll: updatedPoll // Update the entire 'poll' field
 					});
 				} catch (error) {
 					console.error("Error voting on poll:", error);
 					showAlert(`Failed to cast vote: ${error.message || error}.`);
 				}
+			}
 
 
         // Function to copy text to clipboard
