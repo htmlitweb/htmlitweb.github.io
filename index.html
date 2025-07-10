@@ -3258,6 +3258,8 @@
                     if (post.postType === 'HTML Game') {
                         try {
                             const postRef = doc(db, `artifacts/${appId}/public/data/posts`, postId);
+                            // Added console log here for debugging
+                            console.log(`Attempting to increment visits for postId: ${postId} in collection artifacts/${appId}/public/data/posts`);
                             await updateDoc(postRef, { visits: (post.visits || 0) + 1 });
                             post.visits = (post.visits || 0) + 1;
                             
