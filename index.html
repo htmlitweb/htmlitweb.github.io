@@ -785,9 +785,7 @@
             const mobileRegex = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
             // Also consider smaller screens as mobile (e.g., less than 768px width)
             const isSmallScreen = window.innerWidth <= 768; 
-            const isMobile = mobileRegex.test(navigator.userAgent) || isSmallScreen;
-            console.log("isMobileDevice returned:", isMobile, "User Agent:", navigator.userAgent, "Window Width:", window.innerWidth);
-            return isMobile;
+            return mobileRegex.test(navigator.userAgent) || isSmallScreen;
         }
 
         // NEW: Opens the dedicated HTML Game Play Modal
@@ -798,7 +796,6 @@
             }
 
             const mobile = isMobileDevice();
-            console.log("Device compatibility for this game:", deviceCompatibility);
             let compatibilityMessage = '';
 
             if (deviceCompatibility === 'Desktop Only' && mobile) {
@@ -806,7 +803,6 @@
             } else if (deviceCompatibility === 'Mobile Only' && !mobile) {
                 compatibilityMessage = "This game is designed for mobile devices only and may not function correctly on desktop.";
             }
-            console.log("Compatibility message:", compatibilityMessage);
 
             if (compatibilityMessage) {
                 const proceed = await showConfirm(`${compatibilityMessage}\nDo you still want to try playing?`);
@@ -1008,13 +1004,11 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
-                console.log("onAuthStateChanged: User is authenticated. UID:", currentUser.uid);
             } else {
                 // If no user is logged in, attempt to sign in anonymously.
                 try {
                     await signInAnonymously(auth);
                     currentUser = auth.currentUser; // Update currentUser after successful sign-in
-                    console.log("onAuthStateChanged: Signed in anonymously. UID:", currentUser.uid);
                 } catch (error) {
                     console.error("Authentication failed:", error);
                     showAlert(`Authentication failed: ${error.message}. Some features may not work.`);
@@ -1023,7 +1017,6 @@
             // Initialize app state only once after authentication is confirmed ready.
             if (!isAuthReady) {
                 isAuthReady = true;
-                console.log("isAuthReady set to true.");
                 initializeAppState();
             }
         });
@@ -2834,7 +2827,7 @@
                 imageUrl: imageUrl,
                 customYoutubeLinkText: customYoutubeLinkText,
                 postType: postType,
-                madeWith: form.querySelector('#made-with').value.trim(), // Still madeWith, but label changed
+                madeWith: form.querySelector('#made-with').value.trim(), // Still madeWith key
                 aiContent: aiContent,
                 tags: tags,
                 allowComments: allowComments,
@@ -3267,13 +3260,8 @@
                             const postRef = doc(db, `artifacts/${appId}/public/data/posts`, postId);
                             // Added console log here for debugging
                             console.log(`Attempting to increment visits for postId: ${postId} in collection artifacts/${appId}/public/data/posts`);
-                            console.log(`Current user UID before visit increment: ${currentUser?.uid}`);
-                            console.log(`Current visits count before update: ${post.visits || 0}`);
-                            const newVisitsCount = (post.visits || 0) + 1;
-                            console.log(`New visits count to be set: ${newVisitsCount}`);
-
-                            await updateDoc(postRef, { visits: newVisitsCount });
-                            post.visits = newVisitsCount; // Update local state for immediate UI reflection
+                            await updateDoc(postRef, { visits: (post.visits || 0) + 1 });
+                            post.visits = (post.visits || 0) + 1;
                             
                             // Open the dedicated game play modal, passing device compatibility
                             const gameSrcToLoad = playGameBtn.dataset.gameSrc; 
