@@ -3499,20 +3499,22 @@
 
 				// Construct the complete updated poll object
 				const updatedPoll = {
-					...currentPoll, // Spread existing poll data (if any other fields exist in poll)
+					// Spread existing poll data to retain any other fields within 'poll'
+					// if 'post.poll' contains more than just 'options' and 'voters'
+					...(post.poll || {}),
 					options: updatedOptions,
 					voters: newVoters
 				};
 
 				try {
+					// Update the entire 'poll' field with the reconstructed object
 					await updateDoc(postRef, {
-						poll: updatedPoll // Update the entire 'poll' field
+						poll: updatedPoll // <--- CHANGE THIS LINE
 					});
 				} catch (error) {
 					console.error("Error voting on poll:", error);
 					showAlert(`Failed to cast vote: ${error.message || error}.`);
 				}
-			}
 
 
         // Function to copy text to clipboard
