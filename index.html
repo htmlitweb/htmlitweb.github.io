@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HTMLIT</title>
-    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/6379/6379850.png" type="image/png">
+    <link rel="icon" href="https://i.postimg.cc/pdYyyn3X/edit-pen-svgrepo-com.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1621,7 +1621,7 @@
                 const mediaTypeRadios = form.querySelectorAll('input[name="media-type"]');
                 const youtubeLinkSection = form.querySelector('#youtube-link-section');
                 const imageLinkSection = form.querySelector('#image-link-section');
-                const customYoutubeLinkSection = form.querySelector('#custom-youtube-text-section');
+                const customYoutubeLinkSection = form.querySelector('#custom-youtube-link-section');
                 const youtubeLinkHelp = form.querySelector('.youtube-link-help');
                 const imageLinkHelp = form.querySelector('.image-link-help');
                 const htmlGameUrlInput = form.querySelector('#html-game-url'); // Changed from itch-link
@@ -2015,7 +2015,7 @@
                 const mediaTypeRadios = form.querySelectorAll('input[name="media-type"]');
                 const youtubeLinkSection = form.querySelector('#youtube-link-section');
                 const imageLinkSection = form.querySelector('#image-link-section');
-                const customYoutubeLinkSection = form.querySelector('#custom-youtube-text-section'); 
+                const customYoutubeLinkSection = form.querySelector('#custom-youtube-link-section'); 
                 const youtubeLinkHelp = form.querySelector('.youtube-link-help');
                 const imageLinkHelp = form.querySelector('.image-link-help');
                 const htmlGameUrlInput = form.querySelector('#html-game-url'); // Changed
@@ -3255,18 +3255,31 @@
             if (playGameBtn) {
                 playGameBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
+                    // Pause any active YouTube video before playing game
+                    if (!videoModal.classList.contains('hidden')) {
+                        closeVideoModal();
+                    }
+
                     if (post.postType === 'HTML Game') {
+                        // More robust check for authentication before updating visits
+                        if (!currentUser || !isAuthReady) {
+                            showAlert("Please wait for authentication to complete before tracking game plays. If this persists, refresh the page.");
+                            // Still open the game, but don't track the play
+                            const gameSrcToLoad = playGameBtn.dataset.gameSrc; 
+                            const deviceCompatibility = playGameBtn.dataset.deviceCompatibility;
+                            openGamePlayModal(gameSrcToLoad, deviceCompatibility);
+                            return; // Exit here if not authenticated
+                        }
+
                         try {
                             const postRef = doc(db, `artifacts/${appId}/public/data/posts`, postId);
-                            // Added console log here for debugging
-                            console.log(`Attempting to increment visits for postId: ${postId} in collection artifacts/${appId}/public/data/posts`);
                             await updateDoc(postRef, { visits: (post.visits || 0) + 1 });
                             post.visits = (post.visits || 0) + 1;
                             
                             // Open the dedicated game play modal, passing device compatibility
                             const gameSrcToLoad = playGameBtn.dataset.gameSrc; 
-                            const deviceCompatibility = playGameBtn.dataset.deviceCompatibility; // NEW
-                            openGamePlayModal(gameSrcToLoad, deviceCompatibility); // NEW
+                            const deviceCompatibility = playGameBtn.dataset.deviceCompatibility;
+                            openGamePlayModal(gameSrcToLoad, deviceCompatibility);
 
                         } catch (error) {
                             console.error("Error incrementing play count:", error);
