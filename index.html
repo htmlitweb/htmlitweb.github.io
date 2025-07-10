@@ -3417,11 +3417,11 @@
 
             const postRef = doc(db, `artifacts/${appId}/public/data/posts`, postId);
             
-            const newComments = [...(post.comments || []), {
-                authorId: currentUser.uid,
-                text: commentText,
-                timestamp: new Date(),
-            }];
+			const newComments = [...(post.comments || []), {
+				authorId: currentUser.uid,
+				text: commentText,
+				timestamp: new Date(), // Client-side timestamp
+			}];
 
             try {
                 await updateDoc(postRef, { comments: newComments });
