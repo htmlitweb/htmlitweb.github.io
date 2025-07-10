@@ -3493,20 +3493,26 @@
                 return;
             }
 
-            const updatedOptions = JSON.parse(JSON.stringify(currentPoll.options));
-            updatedOptions[optionIndex].votes = (updatedOptions[optionIndex].votes || 0) + 1;
-            newVoters.push(currentUser.uid);
+				const updatedOptions = JSON.parse(JSON.stringify(currentPoll.options));
+				updatedOptions[optionIndex].votes = (updatedOptions[optionIndex].votes || 0) + 1;
+				newVoters.push(currentUser.uid);
 
-            try {
-                await updateDoc(postRef, {
-                    'poll.options': updatedOptions,
-                    'poll.voters': newVoters
-                });
-            } catch (error) {
-                console.error("Error voting on poll:", error);
-                showAlert(`Failed to cast vote: ${error.message || error}.`);
-            }
-        }
+				// Construct the complete updated poll object
+				const updatedPoll = {
+					...currentPoll, // Spread existing poll data (if any other fields exist in poll)
+					options: updatedOptions,
+					voters: newVoters
+				};
+
+				try {
+					await updateDoc(postRef, {
+						poll: updatedPoll // Update the entire 'poll' field
+					});
+				} catch (error) {
+					console.error("Error voting on poll:", error);
+					showAlert(`Failed to cast vote: ${error.message || error}.`);
+				}
+			}
 
 
         // Function to copy text to clipboard
