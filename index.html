@@ -1991,7 +1991,6 @@
                 form.querySelector('#custom-youtube-link-text').value = post.customYoutubeLinkText || '';
 
                 // Removed Pricing pre-fill
-
                 // Set AI Content
                 if (post.aiContent) {
                     const aiRadio = form.querySelector(`input[name="ai-content"][value="${post.aiContent}"]`);
@@ -2071,7 +2070,7 @@
                         trailerLinkInput.setAttribute('required', 'true');
                     } else if (selectedMedia === 'image') {
                         if (imageLinkSection) imageLinkSection.classList.remove('hidden');
-                        if (imageLinkHelp) imageLinkLinkHelp.textContent = '(Optional. Example: https://example.com/your-game-screenshot.png)';
+                        if (imageLinkHelp) imageLinkHelp.textContent = '(Optional. Example: https://example.com/your-game-screenshot.png)';
                         imageUrlInput.setAttribute('required', 'true');
                     } else if (selectedMedia === 'html_embed') { // New HTML embed
                         // No specific required fields for HTML embed media type, as the game itself is the primary content.
@@ -2143,7 +2142,7 @@
                         if (htmlGameUrlInput) {
                             htmlGameUrlInput.removeAttribute('required'); // Will be handled by custom validation
                         }
-                        if (htmlGameUrlLabel) htmlGameUrlLabel.textContent = 'HTML Game URL (Optional)';
+                        if (htmlGameUrlLabel) htmlGameUrlUrlLabel.textContent = 'HTML Game URL (Optional)';
                         if (htmlGameUrlHelp) htmlGameUrlHelp.textContent = '(Link to your hosted HTML game. If both URL and code are provided, URL will be used.)';
                         
                         // Show HTML game code/URL section for HTML Game post type
@@ -2677,7 +2676,7 @@
 
             // Poll data if devlogType is 'Poll' or if postType is 'HTML Game' and addHtmlGamePoll is true
             let pollData = null;
-            if ((postType === 'Devlog' && devlogType === 'Poll') || (postType === 'HTML Game' && addHtmlGamePoll)) { // Changed
+            if (((postType === 'Devlog' && devlogType === 'Poll') || (postType === 'HTML Game' && addHtmlGamePoll)) && !editingPostId) { // Changed: Only allow new polls on new posts
                 const pollQuestion = form.querySelector('#poll-question').value.trim();
                 const pollOptions = [...form.querySelectorAll('.poll-option-input')].map(input => ({
                     text: input.value.trim(),
@@ -2816,26 +2815,6 @@
             }
             // If mediaType is 'none' or 'html_embed', trailerLink and imageUrl will remain empty, which is correct.
 
-            const basePostData = {
-                authorId: currentUser.uid,
-                title: form.querySelector('#game-title').value.trim(),
-                description: form.querySelector('#description').value.trim(),
-                htmlGameUrl: htmlGameUrl, // Changed from itchLink
-                htmlGameCode: htmlGameCode, // New
-                mediaType: mediaType,
-                trailerLink: trailerLink,
-                imageUrl: imageUrl,
-                customYoutubeLinkText: customYoutubeLinkText,
-                postType: postType,
-                madeWith: form.querySelector('#made-with').value.trim(), // Still madeWith key
-                aiContent: aiContent,
-                tags: tags,
-                allowComments: allowComments,
-                general: form.querySelector('#general').value.trim(),
-                reason: form.querySelector('#reason').value.trim(),
-                deviceCompatibility: postType === 'HTML Game' ? deviceCompatibility : deleteField(), // NEW: Only store for HTML Game posts
-            };
-
             try {
                 if (editingPostId) {
                     const postRef = doc(db, `artifacts/${appId}/public/data/posts`, editingPostId);
@@ -2848,49 +2827,82 @@
                         return;
                     }
 
+                    // Build the update payload only with fields that are explicitly part of the form's editable content
                     let updatePayload = {
-                        ...basePostData,
-                        likes: existingPost.likes || [],
-                        comments: existingPost.comments || [],
-                        views: existingPost.views || 0,
-                        visits: existingPost.visits || 0,
-                        createdAt: existingPost.createdAt,
+                        title: form.querySelector('#game-title').value.trim(),
+                        description: form.querySelector('#description').value.trim(),
+                        mediaType: mediaType,
+                        trailerLink: trailerLink,
+                        imageUrl: imageUrl,
+                        customYoutubeLinkText: customYoutubeLinkText,
+                        madeWith: form.querySelector('#made-with').value.trim(),
+                        aiContent: aiContent,
+                        tags: tags,
+                        allowComments: allowComments,
+                        general: form.querySelector('#general').value.trim(),
+                        reason: form.querySelector('#reason').value.trim(),
+                        // Do NOT include likes, comments, views, visits, createdAt directly here.
+                        // These are managed by separate update operations and should not be part of a general form submission.
                     };
 
-                    if (existingPost.poll) {
-                        updatePayload.poll = existingPost.poll;
-                    } else {
-                        if ((postType === 'Devlog' && devlogType === 'Poll') || (postType === 'HTML Game' && addHtmlGamePoll)) { // Changed
-                            updatePayload.poll = pollData;
-                        } else {
-                            updatePayload.poll = deleteField();
-                        }
-                    }
-
-                    if (postType === 'HTML Game') { // Changed
-                        // Removed pricing
+                    // Handle fields specific to HTML Game or Devlog during update
+                    if (postType === 'HTML Game') {
                         updatePayload.genres = genres;
-                        // Removed platforms
-                        updatePayload.linkedGamePromoId = deleteField();
-                        updatePayload.devlogType = deleteField();
-                    } else if (postType === 'Devlog') {
+                        updatePayload.deviceCompatibility = deviceCompatibility;
+                        updatePayload.htmlGameUrl = htmlGameUrl;
+                        updatePayload.htmlGameCode = htmlGameCode;
+                        // Explicitly remove Devlog-specific fields if they exist and are no longer applicable
+                        if (existingPost.linkedGamePromoId !== undefined) updatePayload.linkedGamePromoId = deleteField();
+                        if (existingPost.devlogType !== undefined) updatePayload.devlogType = deleteField();
+                    } else { // Devlog
                         updatePayload.linkedGamePromoId = linkedGamePromoId;
                         updatePayload.devlogType = devlogType;
-                        // Removed pricing
-                        updatePayload.genres = deleteField();
-                        // Removed platforms
+                        // Explicitly remove HTML Game-specific fields if they exist and are no longer applicable
+                        if (existingPost.genres !== undefined) updatePayload.genres = deleteField();
+                        if (existingPost.deviceCompatibility !== undefined) updatePayload.deviceCompatibility = deleteField();
+                        if (existingPost.htmlGameUrl !== undefined) updatePayload.htmlGameUrl = deleteField();
+                        if (existingPost.htmlGameCode !== undefined) updatePayload.htmlGameCode = deleteField();
+                    }
+
+                    // Poll handling for updates: Polls cannot be modified after creation.
+                    // If existing post has a poll, it remains immutable. Do not include it in the payload.
+                    // The security rule will enforce that it's not changed.
+                    if (existingPost.poll) {
+                        // If the post already has a poll, we don't send it in the update payload
+                        // because it's immutable. The security rule will ensure it's not changed.
+                    } else if ((postType === 'Devlog' && devlogType === 'Poll') || (postType === 'HTML Game' && addHtmlGamePoll)) {
+                        // If it's a new poll being added to an existing post (only if it didn't have one before), add it.
+                        updatePayload.poll = pollData;
+                    } else {
+                        // If poll was present and now shouldn't be (e.g., changed devlog type from Poll), delete it.
+                        // This applies if existingPost.poll was defined but now the form indicates no poll.
+                        if (existingPost.poll !== undefined) updatePayload.poll = deleteField();
                     }
                     
-                    await updateDoc(postRef, updatePayload, { merge: true });
+                    console.log("Payload for update post:", JSON.stringify(updatePayload, null, 2)); // LOGGING PAYLOAD
+                    await updateDoc(postRef, updatePayload);
                     showAlert("Post updated successfully!").then(() => {
                         closePostModal();
                         displayLimit = postsPerPage;
                         switchTab('my-posts');
                     });
 
-                } else {
+                } else { // New Post
                     let newPostData = {
-                        ...basePostData,
+                        authorId: currentUser.uid,
+                        title: form.querySelector('#game-title').value.trim(),
+                        description: form.querySelector('#description').value.trim(),
+                        mediaType: mediaType,
+                        trailerLink: trailerLink,
+                        imageUrl: imageUrl,
+                        customYoutubeLinkText: customYoutubeLinkText,
+                        postType: postType,
+                        madeWith: form.querySelector('#made-with').value.trim(),
+                        aiContent: aiContent,
+                        tags: tags,
+                        allowComments: allowComments,
+                        general: form.querySelector('#general').value.trim(),
+                        reason: form.querySelector('#reason').value.trim(),
                         likes: [],
                         comments: [],
                         views: 0,
@@ -2898,21 +2910,29 @@
                         createdAt: serverTimestamp(),
                     };
 
-                    if (postType === 'HTML Game') { // Changed
-                        // Removed pricing
+                    // Handle fields specific to HTML Game or Devlog for new posts
+                    if (postType === 'HTML Game') {
                         newPostData.genres = genres;
-                        // Removed platforms
-                        if (addHtmlGamePoll && pollData) { // Changed
-                            newPostData.poll = pollData;
-                        }
-                    } else if (postType === 'Devlog') {
+                        newPostData.deviceCompatibility = deviceCompatibility;
+                        newPostData.htmlGameUrl = htmlGameUrl;
+                        newPostData.htmlGameCode = htmlGameCode;
+                    } else { // Devlog
                         newPostData.linkedGamePromoId = linkedGamePromoId;
                         newPostData.devlogType = devlogType;
-                        if (devlogType === 'Poll' && pollData) {
-                            newPostData.poll = pollData;
-                        }
+                        // Ensure HTML Game-specific fields are not present in new Devlog document
+                        delete newPostData.genres;
+                        delete newPostData.deviceCompatibility;
+                        delete newPostData.htmlGameUrl;
+                        delete newPostData.htmlGameCode;
                     }
 
+                    // Handle poll for new posts
+                    if ((postType === 'Devlog' && devlogType === 'Poll') || (postType === 'HTML Game' && addHtmlGamePoll)) {
+                        newPostData.poll = pollData;
+                    }
+                    // If no poll, newPostData.poll will not exist, which is correct.
+
+                    console.log("Payload for new post:", JSON.stringify(newPostData, null, 2)); // LOGGING PAYLOAD
                     await addDoc(collection(db, `artifacts/${appId}/public/data/posts`), newPostData);
                     showAlert("Post submitted successfully!").then(() => {
                         form.reset();
@@ -2936,7 +2956,15 @@
                 }
             } catch (error) {
                 console.error("Error handling post:", error);
-                showAlert(`Failed to ${editingPostId ? 'update' : 'submit'} post: ${error.message || error}. This often happens due to incorrect Firebase Security Rules or network issues. Please check your browser console for more details.`);
+                let errorMessage = `Failed to ${editingPostId ? 'update' : 'submit'} post: ${error.message || error}.`;
+                if (error.code && error.code === 'permission-denied') {
+                    errorMessage += " This is often due to incorrect Firebase Security Rules. Please check your browser console for more details and consider simulating the request in the Firebase Rules Playground.";
+                } else if (error.code && error.code === 'invalid-argument') {
+                    errorMessage += " This indicates an issue with the data format or type. Please check your browser console for details and compare the payload with your Firebase Security Rules.";
+                } else if (error.message && error.message.includes('400')) {
+                    errorMessage += " A '400 Bad Request' error usually means the data sent violates a server-side validation or security rule. Please check your browser console for the exact payload and simulate it in the Firebase Rules Playground.";
+                }
+                showAlert(errorMessage);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = editingPostId ? 'Update Post' : 'Submit Post';
