@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HTMLIT</title>
-    <link rel="icon" href="https://i.postimg.cc/pdYyyn3X/edit-pen-svgrepo-com.png" type="image/png">
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/6379/6379850.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -778,12 +778,38 @@
             toggleFullscreen(videoModalContent, false); // Force fullscreen off on close
         }
 
+        // NEW: Detects if the current device is likely a mobile device.
+        function isMobileDevice() {
+            // Check for common mobile user agent strings
+            const mobileRegex = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+            // Also consider smaller screens as mobile (e.g., less than 768px width)
+            const isSmallScreen = window.innerWidth <= 768; 
+            return mobileRegex.test(navigator.userAgent) || isSmallScreen;
+        }
+
         // NEW: Opens the dedicated HTML Game Play Modal
-        function openGamePlayModal(gameSrc) {
+        async function openGamePlayModal(gameSrc, deviceCompatibility) {
             if (!gameSrc) {
                 showAlert("No game source provided.");
                 return;
             }
+
+            const mobile = isMobileDevice();
+            let compatibilityMessage = '';
+
+            if (deviceCompatibility === 'Desktop Only' && mobile) {
+                compatibilityMessage = "This game is designed for desktop only and may not function correctly on mobile devices.";
+            } else if (deviceCompatibility === 'Mobile Only' && !mobile) {
+                compatibilityMessage = "This game is designed for mobile devices only and may not function correctly on desktop.";
+            }
+
+            if (compatibilityMessage) {
+                const proceed = await showConfirm(`${compatibilityMessage}\nDo you still want to try playing?`);
+                if (!proceed) {
+                    return;
+                }
+            }
+
             gameIframePlayer.src = gameSrc;
             gamePlayModal.classList.remove('hidden');
             // Apply fullscreen if setting is enabled
@@ -1403,6 +1429,26 @@
                         </div>
                         <!-- End HTML Game URL/Code Section -->
                         
+                        <!-- NEW: Device Compatibility Section -->
+                        <div id="device-compatibility-section">
+                            <label class="block mb-2 font-semibold text-gray-300">Device Compatibility</label>
+                            <div class="flex flex-col sm:flex-row gap-4">
+                                <label class="custom-checkbox">
+                                    <input type="radio" name="device-compatibility" value="Desktop Only" checked>
+                                    <span>Desktop Only</span>
+                                </label>
+                                <label class="custom-checkbox">
+                                    <input type="radio" name="device-compatibility" value="Mobile Only">
+                                    <span>Mobile Only</span>
+                                </label>
+                                <label class="custom-checkbox">
+                                    <input type="radio" name="device-compatibility" value="Both">
+                                    <span>Both (Desktop & Mobile)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- End Device Compatibility Section -->
+
                         <!-- Media Selection Section -->
                         <div class="mb-4">
                             <label class="block mb-2 font-semibold text-gray-300">Choose Media for Display</label>
@@ -1564,6 +1610,7 @@
                 const addHtmlGamePollRadios = form.querySelectorAll('input[name="add-html-game-poll"]'); // Changed
                 const pollSection = form.querySelector('#poll-section');
                 const genreSection = form.querySelector('#genre-section');
+                const deviceCompatibilitySection = form.querySelector('#device-compatibility-section'); // NEW
                 // Removed platformSection
                 // Removed pricingSection
                 const commentsStatusSection = form.querySelector('#comments-status-section');
@@ -1713,6 +1760,7 @@
                     if (pollSection) pollSection.classList.add('hidden');
                     form.querySelector('#poll-question')?.removeAttribute('required');
                     form.querySelectorAll('.poll-option-input').forEach(input => input.removeAttribute('required'));
+                    if (deviceCompatibilitySection) deviceCompatibilitySection.classList.add('hidden'); // NEW
 
                     console.log("togglePostTypeFieldsInternal: selectedPostType =", selectedPostType, "selectedDevlogType =", selectedDevlogType, "addHtmlGamePoll =", addHtmlGamePoll);
 
@@ -1723,6 +1771,7 @@
                         // Removed pricingSection.classList.add('hidden');
                         if (commentsStatusSection) commentsStatusSection.classList.add('hidden');
                         if (linkedGamePromoSection) linkedGamePromoSection.classList.remove('hidden');
+                        if (deviceCompatibilitySection) deviceCompatibilitySection.classList.add('hidden'); // NEW
 
                         if (htmlGameUrlInput) {
                             htmlGameUrlInput.removeAttribute('required');
@@ -1749,6 +1798,7 @@
                         if (commentsStatusSection) commentsStatusSection.classList.remove('hidden');
                         if (linkedGamePromoSection) linkedGamePromoSection.classList.add('hidden');
                         if (htmlGamePollToggle) htmlGamePollToggle.classList.remove('hidden');
+                        if (deviceCompatibilitySection) deviceCompatibilitySection.classList.remove('hidden'); // NEW
 
                         if (htmlGameUrlInput) {
                             // HTML Game requires either URL or Code
@@ -1891,6 +1941,12 @@
                     form.querySelector('input[name="add-html-game-poll"][value="false"]').checked = true; // Changed
                 }
 
+                // NEW: Set Device Compatibility
+                if (post.deviceCompatibility) {
+                    const deviceCompatibilityRadio = form.querySelector(`input[name="device-compatibility"][value="${post.deviceCompatibility}"]`);
+                    if (deviceCompatibilityRadio) deviceCompatibilityRadio.checked = true;
+                }
+
 
                 // Set Media Type and links
                 if (post.mediaType) {
@@ -1938,6 +1994,7 @@
                 const devlogTypeSection = form.querySelector('#devlog-type-section');
                 const htmlGamePollToggle = form.querySelector('#html-game-poll-toggle'); // Changed
                 const genreSection = form.querySelector('#genre-section');
+                const deviceCompatibilitySection = form.querySelector('#device-compatibility-section'); // NEW
                 // Removed platformSection
                 // Removed pricingSection
                 const commentsStatusSection = form.querySelector('#comments-status-section');
@@ -2004,6 +2061,7 @@
                     if (pollSection) pollSection.classList.add('hidden');
                     form.querySelector('#poll-question')?.removeAttribute('required');
                     form.querySelectorAll('.poll-option-input').forEach(input => input.removeAttribute('required'));
+                    if (deviceCompatibilitySection) deviceCompatibilitySection.classList.add('hidden'); // NEW
 
                     console.log("togglePostTypeFieldsEdit: selectedPostType =", selectedPostType, "selectedDevlogType =", selectedDevlogType, "addHtmlGamePoll =", addHtmlGamePoll);
 
@@ -2015,6 +2073,7 @@
                         // Removed pricingSection.classList.add('hidden');
                         if (commentsStatusSection) commentsStatusSection.classList.add('hidden');
                         if (linkedGamePromoSection) linkedGamePromoSection.classList.remove('hidden');
+                        if (deviceCompatibilitySection) deviceCompatibilitySection.classList.add('hidden'); // NEW
 
                         if (htmlGameUrlInput) {
                             htmlGameUrlInput.removeAttribute('required');
@@ -2046,6 +2105,7 @@
                         if (commentsStatusSection) commentsStatusSection.classList.remove('hidden');
                         if (linkedGamePromoSection) linkedGamePromoSection.classList.add('hidden');
                         if (htmlGamePollToggle) htmlGamePollToggle.classList.remove('hidden');
+                        if (deviceCompatibilitySection) deviceCompatibilitySection.classList.remove('hidden'); // NEW
 
                         if (htmlGameUrlInput) {
                             htmlGameUrlInput.removeAttribute('required'); // Will be handled by custom validation
@@ -2476,6 +2536,7 @@
             const linkedGamePromoId = form.querySelector('#linked-game-promo')?.value || null;
             const devlogType = form.querySelector('#devlog-type')?.value || null;
             const addHtmlGamePoll = form.querySelector('input[name="add-html-game-poll"]:checked')?.value === 'true'; // Changed
+            const deviceCompatibility = form.querySelector('input[name="device-compatibility"]:checked')?.value; // NEW
 
             // Poll data if devlogType is 'Poll' or if postType is 'HTML Game' and addHtmlGamePoll is true
             let pollData = null;
@@ -2514,6 +2575,13 @@
                 // HTML Game requires either URL or Code
                 if (!htmlGameUrl && !htmlGameCode) {
                     showAlert("For HTML Game, please provide either an HTML Game URL or paste the HTML Game Code.");
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = editingPostId ? 'Update Post' : 'Submit Post';
+                    return;
+                }
+                // Validate device compatibility
+                if (!deviceCompatibility) { // NEW
+                    showAlert("Please select the device compatibility for your HTML Game.");
                     submitBtn.disabled = false;
                     submitBtn.textContent = editingPostId ? 'Update Post' : 'Submit Post';
                     return;
@@ -2621,6 +2689,7 @@
                 allowComments: allowComments,
                 general: form.querySelector('#general').value.trim(),
                 reason: form.querySelector('#reason').value.trim(),
+                deviceCompatibility: postType === 'HTML Game' ? deviceCompatibility : deleteField(), // NEW: Only store for HTML Game posts
             };
 
             try {
@@ -2920,7 +2989,7 @@
             // "Play Game" button logic for HTML Game posts
             if (post.postType === 'HTML Game' && gameSrc) {
                 playGameButtonHtml = `
-                    <button id="play-game-btn" class="btn-primary flex items-center justify-center gap-2 px-4 py-2 sm:px-6 sm:py-3 rounded-md text-white font-bold hover:scale-105 transition-transform text-sm sm:text-base" data-game-src="${gameSrc}">
+                    <button id="play-game-btn" class="btn-primary flex items-center justify-center gap-2 px-4 py-2 sm:px-6 sm:py-3 rounded-md text-white font-bold hover:scale-105 transition-transform text-sm sm:text-base" data-game-src="${gameSrc}" data-device-compatibility="${post.deviceCompatibility || 'Both'}">
                         <i class="fas fa-play"></i> Play Game
                     </button>
                 `;
@@ -2981,6 +3050,7 @@
 					<span><strong>Views:</strong> ${formatNumberForDisplay(post.views || 0)}</span>
 					${post.postType === 'HTML Game' ? `
 						<span><strong>Plays:</strong> ${formatNumberForDisplay(post.visits || 0)}</span> <!-- Changed text -->
+                        <span><strong>Compatibility:</strong> ${post.deviceCompatibility || 'Not specified'}</span> <!-- NEW -->
 					` : ''}
                 </div>
                 <p class="text-gray-300 my-4 text-justify text-sm sm:text-base">${post.description}</p>
@@ -3047,9 +3117,10 @@
                             await updateDoc(postRef, { visits: (post.visits || 0) + 1 });
                             post.visits = (post.visits || 0) + 1;
                             
-                            // Open the dedicated game play modal
+                            // Open the dedicated game play modal, passing device compatibility
                             const gameSrcToLoad = playGameBtn.dataset.gameSrc; 
-                            openGamePlayModal(gameSrcToLoad);
+                            const deviceCompatibility = playGameBtn.dataset.deviceCompatibility; // NEW
+                            openGamePlayModal(gameSrcToLoad, deviceCompatibility); // NEW
 
                         } catch (error) {
                             console.error("Error incrementing play count:", error);
