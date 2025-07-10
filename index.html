@@ -587,6 +587,7 @@
         let currentSortBy = 'newest'; // Default sort order for community feed
         // Removed currentPricingFilter as pricing is no longer a filter for HTML Games
         let currentAiContentFilter = 'all'; // New: Default AI content filter
+        let currentDeviceCompatibilityFilter = 'all'; // NEW: Default device compatibility filter
 
         // Global array to store selected genres, persisting across search filters
         let selectedGenres = []; 
@@ -1205,7 +1206,7 @@
         }
         
         // Helper function to render a grid of posts with filtering and sorting
-        function renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter = true, includeSortBy = true, isMyPostPage = false) { // Removed includePricingFilter
+        function renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter = true, includeSortBy = true, isMyPostPage = false, includeDeviceCompatibilityFilter = false) { // Added includeDeviceCompatibilityFilter
             let filteredPosts = posts;
 
             // Removed pricing filter logic
@@ -1214,6 +1215,15 @@
                 filteredPosts = filteredPosts.filter(post => {
                     if (currentAiContentFilter === 'all') return true;
                     return post.aiContent === currentAiContentFilter;
+                });
+            }
+
+            // NEW: Apply device compatibility filter
+            if (includeDeviceCompatibilityFilter) {
+                filteredPosts = filteredPosts.filter(post => {
+                    if (currentDeviceCompatibilityFilter === 'all') return true;
+                    // Only filter HTML Games by compatibility, or if the post doesn't have deviceCompatibility, don't filter it out
+                    return post.postType !== 'HTML Game' || post.deviceCompatibility === currentDeviceCompatibilityFilter;
                 });
             }
 
@@ -1238,6 +1248,16 @@
                                     <option value="all" ${currentAiContentFilter === 'all' ? 'selected' : ''}>AI Content (All)</option>
                                     <option value="Yes" ${currentAiContentFilter === 'Yes' ? 'selected' : ''}>No (AI Content)</option>
                                     <option value="No" ${currentAiContentFilter === 'No' ? 'selected' : ''}>Yes (No AI Content)</option>
+                                </select>
+                            </div>
+                        ` : ''}
+                        ${includeDeviceCompatibilityFilter ? `
+                            <div class="custom-select w-full sm:w-auto">
+                                <select id="device-compatibility-filter" class="input-bg rounded-md p-2 pl-4 pr-8 w-full">
+                                    <option value="all" ${currentDeviceCompatibilityFilter === 'all' ? 'selected' : ''}>Compatibility (All)</option>
+                                    <option value="Desktop Only" ${currentDeviceCompatibilityFilter === 'Desktop Only' ? 'selected' : ''}>Desktop Only</option>
+                                    <option value="Mobile Only" ${currentDeviceCompatibilityFilter === 'Mobile Only' ? 'selected' : ''}>Mobile Only</option>
+                                    <option value="Both" ${currentDeviceCompatibilityFilter === 'Both' ? 'selected' : ''}>Both</option>
                                 </select>
                             </div>
                         ` : ''}
@@ -1268,7 +1288,7 @@
                     sortBySelect.addEventListener('change', (e) => {
                         currentSortBy = e.target.value;
                         displayLimit = postsPerPage; // Reset limit on sort change
-                        renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter, includeSortBy, isMyPostPage); // Removed pricing filter
+                        renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter, includeSortBy, isMyPostPage, includeDeviceCompatibilityFilter); // Pass new filter
                     });
                 }
             }
@@ -1279,7 +1299,18 @@
                     aiContentFilterSelect.addEventListener('change', (e) => {
                         currentAiContentFilter = e.target.value;
                         displayLimit = postsPerPage; // Reset limit on filter change
-                        renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter, includeSortBy, isMyPostPage); // Removed pricing filter
+                        renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter, includeSortBy, isMyPostPage, includeDeviceCompatibilityFilter); // Pass new filter
+                    });
+                }
+            }
+            // NEW: Device compatibility filter event listener
+            if (includeDeviceCompatibilityFilter) {
+                const deviceCompatibilityFilterSelect = targetElement.querySelector('#device-compatibility-filter');
+                if (deviceCompatibilityFilterSelect) {
+                    deviceCompatibilityFilterSelect.addEventListener('change', (e) => {
+                        currentDeviceCompatibilityFilter = e.target.value;
+                        displayLimit = postsPerPage; // Reset limit on filter change
+                        renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter, includeSortBy, isMyPostPage, includeDeviceCompatibilityFilter);
                     });
                 }
             }
@@ -1295,7 +1326,7 @@
                     loadMoreBtn.classList.add('animate-pulse'); // Add Tailwind pulse animation
 
                     displayLimit += postsPerPage;
-                    renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter, includeSortBy, isMyPostPage); // Removed pricing filter
+                    renderPostsGrid(targetElement, posts, pageTitle, includeAiContentFilter, includeSortBy, isMyPostPage, includeDeviceCompatibilityFilter); // Pass new filter
                     // The button will be re-rendered by renderPostsGrid, effectively resetting its state.
                 });
             }
@@ -1305,19 +1336,19 @@
         // Renders the main community feed page.
         function renderCommunityPage() {
             const communityPosts = allFetchedPosts.filter(p => p.postType === 'HTML Game' || p.postType === 'Devlog'); // Changed from Game Promotion
-            renderPostsGrid(contentCommunity, communityPosts, "Community Feed", true, true, false); // Removed pricing filter
+            renderPostsGrid(contentCommunity, communityPosts, "Community Feed", true, true, false, true); // Pass true for device compatibility filter
         }
 
         // Renders the HTML Games page.
         function renderHtmlGamesPage() { // Changed from renderPromosPage
             const htmlGamePosts = allFetchedPosts.filter(p => p.postType === 'HTML Game'); // Changed filter
-            renderPostsGrid(contentHtmlGames, htmlGamePosts, "HTML Games", true, true, false); // Changed title, removed pricing filter
+            renderPostsGrid(contentHtmlGames, htmlGamePosts, "HTML Games", true, true, false, true); // Pass true for device compatibility filter
         }
 
         // Renders the Devlogs page.
         function renderDevlogsPage() {
             const devlogPosts = allFetchedPosts.filter(p => p.postType === 'Devlog');
-            renderPostsGrid(contentDevlogs, devlogPosts, "Devlogs", true, true, false); // Removed pricing filter
+            renderPostsGrid(contentDevlogs, devlogPosts, "Devlogs", true, true, false, false); // No device compatibility filter for devlogs
         }
         
         // Renders the form for creating a new post.
@@ -1795,7 +1826,7 @@
                         if (genreSection) genreSection.classList.remove('hidden');
                         // Removed platformSection.classList.remove('hidden');
                         // Removed pricingSection.classList.remove('hidden');
-                        if (commentsStatusSection) commentsStatusStatusSection.classList.remove('hidden');
+                        if (commentsStatusSection) commentsStatusSection.classList.remove('hidden'); // Fix: should be commentsStatusSection
                         if (linkedGamePromoSection) linkedGamePromoSection.classList.add('hidden');
                         if (htmlGamePollToggle) htmlGamePollToggle.classList.remove('hidden');
                         if (deviceCompatibilitySection) deviceCompatibilitySection.classList.remove('hidden'); // NEW
@@ -1833,6 +1864,8 @@
                     togglePostTypeFieldsInternal();
                     selectedGenres = []; // Clear genres for new post
                     renderGenreCheckboxes(genreCheckboxesContainer); // Re-render to clear checkboxes
+                    // NEW: Ensure initial state of post type is correctly applied
+                    postTypeSelect.dispatchEvent(new Event('change'));
                 }
 
                 // Genre search functionality
@@ -2184,7 +2217,7 @@
         // Renders the user's own posts page.
         function renderMyPostsPage() {
             const myPosts = allFetchedPosts.filter(p => p.authorId === currentUser?.uid);
-            renderPostsGrid(contentMyPosts, myPosts, "My Posts", true, true, true); // Removed pricing filter
+            renderPostsGrid(contentMyPosts, myPosts, "My Posts", true, true, true, true); // Pass true for device compatibility filter
         }
 
 		// Renders the About page content.
