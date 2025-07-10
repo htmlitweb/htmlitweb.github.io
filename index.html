@@ -1795,7 +1795,7 @@
                         if (genreSection) genreSection.classList.remove('hidden');
                         // Removed platformSection.classList.remove('hidden');
                         // Removed pricingSection.classList.remove('hidden');
-                        if (commentsStatusSection) commentsStatusSection.classList.remove('hidden');
+                        if (commentsStatusSection) commentsStatusStatusSection.classList.remove('hidden');
                         if (linkedGamePromoSection) linkedGamePromoSection.classList.add('hidden');
                         if (htmlGamePollToggle) htmlGamePollToggle.classList.remove('hidden');
                         if (deviceCompatibilitySection) deviceCompatibilitySection.classList.remove('hidden'); // NEW
@@ -2038,7 +2038,7 @@
                         trailerLinkInput.setAttribute('required', 'true');
                     } else if (selectedMedia === 'image') {
                         if (imageLinkSection) imageLinkSection.classList.remove('hidden');
-                        if (imageLinkHelp) imageLinkHelp.textContent = '(Optional. Example: https://example.com/your-game-screenshot.png)';
+                        if (imageLinkHelp) imageLinkLinkHelp.textContent = '(Optional. Example: https://example.com/your-game-screenshot.png)';
                         imageUrlInput.setAttribute('required', 'true');
                     } else if (selectedMedia === 'html_embed') { // New HTML embed
                         // No specific required fields for HTML embed media type, as the game itself is the primary content.
@@ -2473,6 +2473,10 @@
         function listenForPostsRealtime() {
             const postsColRef = collection(db, `artifacts/${appId}/public/data/posts`);
             onSnapshot(postsColRef, (snapshot) => {
+                // Create a temporary map for quick lookup of old posts
+                const oldPostsMap = new Map(allFetchedPosts.map(p => [p.id, p]));
+
+                // Update allFetchedPosts first
                 allFetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 allFetchedPosts.sort((a, b) => {
                     const dateA = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(0);
@@ -2480,22 +2484,122 @@
                     return dateB - dateA;
                 });
 
-                const activeTab = document.querySelector('.nav-item.active')?.getAttribute('data-tab') || 'community';
-                if (activeTab === 'community') {
-                    renderCommunityPage();
-                } else if (activeTab === 'my-posts') {
-                    renderMyPostsPage();
-                } else if (activeTab === 'html-games') { // Changed
-                    renderHtmlGamesPage(); // Changed
-                } else if (activeTab === 'devlogs') {
-                    renderDevlogsPage();
-                } else if (activeTab === 'search') {
-                    handleSearch();
+                let shouldFullReRender = false; // Flag to decide if we need to re-render the entire grid
+
+                snapshot.docChanges().forEach(change => {
+                    const changedPost = { id: change.doc.id, ...change.doc.data() };
+                    const oldPost = oldPostsMap.get(changedPost.id);
+
+                    if (change.type === "added") {
+                        console.log("Post added:", changedPost.id);
+                        shouldFullReRender = true; // A new post might affect sorting/filtering, so re-render
+                    } else if (change.type === "removed") {
+                        console.log("Post removed:", changedPost.id);
+                        shouldFullReRender = true; // Removal definitely affects the grid
+                    } else if (change.type === "modified") {
+                        console.log("Post modified:", changedPost.id);
+                        let nonCountFieldChanged = false;
+                        if (oldPost) {
+                            for (const key in changedPost) {
+                                // Skip these for the 'non-count' check, as they are handled separately or expected to change
+                                if (['likes', 'comments', 'views', 'visits', 'createdAt'].includes(key)) {
+                                    continue;
+                                }
+                                // Deep compare for objects/arrays, simple compare for primitives
+                                if (JSON.stringify(changedPost[key]) !== JSON.stringify(oldPost[key])) {
+                                    nonCountFieldChanged = true;
+                                    break;
+                                }
+                            }
+                            // Also check if any field was added or removed (excluding the count fields)
+                            if (Object.keys(changedPost).length !== Object.keys(oldPost).length) {
+                                const oldKeys = new Set(Object.keys(oldPost).filter(k => !['likes', 'comments', 'views', 'visits', 'createdAt'].includes(k)));
+                                const newKeys = new Set(Object.keys(changedPost).filter(k => !['likes', 'comments', 'views', 'visits', 'createdAt'].includes(k)));
+                                if (oldKeys.size !== newKeys.size || ![...oldKeys].every(key => newKeys.has(key))) {
+                                    nonCountFieldChanged = true;
+                                }
+                            }
+                        } else {
+                            // If oldPost is null, it means it's a new post or somehow not in oldPostsMap,
+                            // so treat as a full re-render needed.
+                            nonCountFieldChanged = true;
+                        }
+
+                        if (!nonCountFieldChanged) {
+                            console.log("Only counts or timestamp changed for post:", changedPost.id);
+                            // Find the existing card and update its counts directly
+                            const cardElement = document.querySelector(`.card-bg[data-id="${changedPost.id}"]`);
+                            if (cardElement) {
+                                // Update likes count
+                                const likeCountSpan = cardElement.querySelector('.like-btn span');
+                                if (likeCountSpan) {
+                                    likeCountSpan.textContent = formatNumberForDisplay(changedPost.likes?.length || 0);
+                                    const heartIcon = cardElement.querySelector('.like-btn i');
+                                    if (heartIcon) {
+                                        if (changedPost.likes?.includes(currentUser?.uid)) {
+                                            heartIcon.classList.replace('far', 'fas');
+                                            heartIcon.classList.add('text-red-500');
+                                        } else {
+                                            heartIcon.classList.replace('fas', 'far');
+                                            heartIcon.classList.remove('text-red-500');
+                                        }
+                                    }
+                                }
+
+                                // Update comments count
+                                const commentCountSpan = cardElement.querySelector('.comment-btn span');
+                                if (commentCountSpan) {
+                                    commentCountSpan.textContent = formatNumberForDisplay(changedPost.comments?.length || 0);
+                                }
+
+                                // Update views count
+                                const viewCountSpan = cardElement.querySelector('.fa-eye + span');
+                                if (viewCountSpan) {
+                                    viewCountSpan.textContent = formatNumberForDisplay(changedPost.views || 0);
+                                }
+
+                                // Update visits count (for HTML Games)
+                                const visitCountSpan = cardElement.querySelector('.fa-gamepad + span');
+                                if (visitCountSpan) {
+                                    visitCountSpan.textContent = formatNumberForDisplay(changedPost.visits || 0);
+                                }
+                            }
+                        } else {
+                            console.log("Other fields changed for post:", changedPost.id);
+                            shouldFullReRender = true; // Other changes mean re-render the whole grid
+                        }
+                    }
+                });
+
+                // Only re-render the entire grid if structural changes occurred (added, removed, or non-count modifications)
+                if (shouldFullReRender) {
+                    const activeTab = document.querySelector('.nav-item.active')?.getAttribute('data-tab') || 'community';
+                    if (activeTab === 'community') {
+                        renderCommunityPage();
+                    } else if (activeTab === 'my-posts') {
+                        renderMyPostsPage();
+                    } else if (activeTab === 'html-games') {
+                        renderHtmlGamesPage();
+                    } else if (activeTab === 'devlogs') {
+                        renderDevlogsPage();
+                    } else if (activeTab === 'search') {
+                        handleSearch(); // Search results might need a full re-evaluation
+                    }
                 }
+
+                // Always update the open post modal if it exists and the post it's displaying has changed
                 if (isPostModalOpen) {
                     const currentPostId = modalContent.querySelector('.modal-action-btn[data-post-id]')?.dataset.postId || editingPostId;
                     if (currentPostId) {
-                        openPostModal(currentPostId, false, false);
+                        const updatedPostInAllFetched = allFetchedPosts.find(p => p.id === currentPostId);
+                        if (updatedPostInAllFetched) {
+                            // Re-open the modal with the updated data, but don't increment view again
+                            openPostModal(currentPostId, false, false); 
+                        } else {
+                            // If the post was deleted while modal was open
+                            closePostModal();
+                            showAlert("The post you were viewing has been deleted.");
+                        }
                     }
                 }
             }, error => {
@@ -2575,6 +2679,13 @@
                 // HTML Game requires either URL or Code
                 if (!htmlGameUrl && !htmlGameCode) {
                     showAlert("For HTML Game, please provide either an HTML Game URL or paste the HTML Game Code.");
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = editingPostId ? 'Update Post' : 'Submit Post';
+                    return;
+                }
+                // NEW: HTML Game code size check
+                if (htmlGameCode && new TextEncoder().encode(htmlGameCode).length > 1048576) { // 1MB = 1048576 bytes
+                    showAlert("HTML Game code exceeds 1MB. Please use the HTML Game URL option for larger codebases.");
                     submitBtn.disabled = false;
                     submitBtn.textContent = editingPostId ? 'Update Post' : 'Submit Post';
                     return;
